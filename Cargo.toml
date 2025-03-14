@@ -1,0 +1,48 @@
+[package]
+name = "civ7-mod-manager"
+version = "0.1.0-beta"
+authors = ["Haru Kim <haruleekim@icloud.com>"]
+edition = "2024"
+
+[[bin]]
+name = "civ7-mod-manager-cli"
+path = "src/bin/cli.rs"
+required-features = ["cli"]
+
+[[bin]]
+name = "civ7-mod-manager-gui"
+path = "src/bin/gui/main.rs"
+required-features = ["gui"]
+
+[features]
+default = ["cli", "gui"]
+cli = ["clap", "prettytable"]
+gui = ["dioxus"]
+
+[dependencies]
+anyhow = "1"
+async-trait = "0.1"
+chrono = "0.4"
+clap = { version = "4", features = ["derive"], optional = true }
+compress-tools = "0.15"
+dioxus = { version = "0.6", features = ["desktop"], optional = true }
+dir-size = "0.1"
+prettytable = { version = "0.10", optional = true }
+reqwest = "0.12"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+tempfile = "3"
+tokio = { version = "1", features = ["macros", "rt-multi-thread"] }
+url = "2"
+
+[profile]
+
+[profile.wasm-dev]
+inherits = "dev"
+opt-level = 1
+
+[profile.server-dev]
+inherits = "dev"
+
+[profile.android-dev]
+inherits = "dev"

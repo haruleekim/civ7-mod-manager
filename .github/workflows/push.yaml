@@ -1,0 +1,88 @@
+name: Workflow for push
+
+permissions:
+  contents: write
+
+on: [push]
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-latest
+            version: stable
+            target: x86_64-pc-windows-msvc
+            platform: windows
+            package_type: nsis
+
+          - os: macos-latest
+            version: stable
+            target: aarch64-apple-darwin
+            platform: macos
+            package_type: dmg
+
+    runs-on: ${{ matrix.os }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Windows
+        if: ${{ startsWith(matrix.os, 'windows') }}
+        uses: ./.github/actions/setup-windows
+
+      - name: Setup MacOS
+        if: ${{ startsWith(matrix.os, 'macos') }}
+        uses: ./.github/actions/setup-macos
+        env:
+          APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
+          APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+
+      - name: Setup Ubuntu
+        if: ${{ startsWith(matrix.os, 'ubuntu') }}
+        uses: ./.github/actions/setup-ubuntu
+
+      - name: Setup Rust
+        uses: actions-rs/toolchain@v1
+        with:
+          toolchain: ${{ matrix.version }}-${{ matrix.target }}
+          profile: minimal
+          override: true
+
+      - name: Generate `Cargo.lock`
+        uses: actions-rs/cargo@v1
+        with:
+          command: generate-lockfile
+
+      - name: Cache Cargo
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: ${{ matrix.version }}-${{ matrix.target }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+
+      - name: Build CLI
+        uses: ./.github/actions/build-cli
+        with:
+          version: ${{ matrix.version }}
+          target: ${{ matrix.target }}
+
+      - name: Build GUI
+        uses: ./.github/actions/build-gui
+        with:
+          version: ${{ matrix.version }}
+          target: ${{ matrix.target }}
+          platform: ${{ matrix.platform }}
+          package_type: ${{ matrix.package_type }}
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+
+      - name: Release
+        if: ${{ github.ref_type == 'tag' }}
+        uses: softprops/action-gh-release@v2
+        with:
+          files: dist/*

@@ -1,0 +1,18 @@
+[application]
+name = "Civ7 Mod Manager"
+default_platform = "desktop"
+out_dir = "dist"
+asset_dir = "assets"
+
+[web.app]
+title = "Civ7 Mod Manager"
+
+[bundle]
+identifier = "xyz.harukim.civ7-mod-manager"
+publisher = "Haru Kim"
+icon = ["assets/icon.ico"]
+
+[bundle.macos]
+signing_identity = "Civ7 Mod Manager"
+files = {}
+hardened_runtime = false

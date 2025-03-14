@@ -1,0 +1,11 @@
+name: Setup Ubuntu
+description: Install build dependencies for Ubuntu
+
+runs:
+  using: "composite"
+  steps:
+    - shell: bash
+      run: |
+        sudo apt-get update
+        sudo apt-get install libarchive-dev libb2-dev liblz4-dev libacl1-dev libzstd-dev nettle-dev libglib2.0-dev libgtk-3-dev pkg-config
+        echo "PKG_CONFIG_PATH=/usr/lib/x86_64-linux-gnu/pkgconfig" >> $GITHUB_ENV

@@ -1,0 +1,27 @@
+name: Build CLI
+description: Build CLI
+
+inputs:
+  version:
+    description: "Rust toolchain version"
+    required: true
+
+  target:
+    description: "Rust target"
+    required: true
+
+runs:
+  using: "composite"
+  steps:
+    - uses: actions-rs/cargo@v1
+      with:
+        command: build
+        args: --release --target ${{ inputs.target }} --bin civ7-mod-manager-cli --no-default-features --features cli
+
+    - shell: bash
+      run: ls target/${{ inputs.target }}/release
+
+    - shell: bash
+      run: |
+        mkdir -p dist
+        mv target/${{ inputs.target }}/release/civ7-mod-manager-cli dist/civ7-mod-manager-cli-${{ inputs.version }}-${{ inputs.target }}

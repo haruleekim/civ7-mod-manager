@@ -1,0 +1,36 @@
+name: Setup Windows
+description: Install build dependencies for Windows
+
+runs:
+  using: "composite"
+  steps:
+    - shell: bash
+      run: |
+        echo "VCPKG_ROOT=C:\vcpkg" >> $GITHUB_ENV
+        echo "VCPKG_DEFAULT_TRIPLET=x64-windows-static" >> $GITHUB_ENV
+        echo "VCPKGRS_DYNAMIC=0" >> $GITHUB_ENV
+        echo "RUSTFLAGS=-C target-feature=+crt-static" >> $GITHUB_ENV
+
+    - uses: actions/cache/restore@v4
+      id: vcpkg-cache-restore
+      with:
+        key: vcpkg-cache
+        path: |
+          C:\vcpkg\downloads
+          C:\vcpkg\installed
+          C:\vcpkg\packages
+          C:\vcpkg\buildtrees
+
+    - shell: bash
+      run: |
+        vcpkg integrate install
+        vcpkg install libarchive:x64-windows-static
+
+    - uses: actions/cache/save@v4
+      with:
+        key: ${{ steps.vcpkg-cache-restore.outputs.cache-primary-key }}
+        path: |
+          C:\vcpkg\downloads
+          C:\vcpkg\installed
+          C:\vcpkg\packages
+          C:\vcpkg\buildtrees

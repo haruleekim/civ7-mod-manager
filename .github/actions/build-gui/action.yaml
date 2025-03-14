@@ -1,0 +1,53 @@
+name: Build GUI
+description: Build GUI
+
+inputs:
+  version:
+    description: "Rust toolchain version"
+    required: true
+
+  target:
+    description: "Rust target"
+    required: true
+
+  platform:
+    description: "Platform to build for"
+    required: true
+
+  package_type:
+    description: "Package type to build"
+    required: true
+
+runs:
+  using: "composite"
+  steps:
+    - name: Install cargo-binstall
+      uses: cargo-bins/cargo-binstall@main
+
+    - name: Install dioxus-cli
+      uses: actions-rs/cargo@v1
+      with:
+        command: binstall
+        args: dioxus-cli --no-confirm --targets ${{ inputs.target }}
+
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: "23"
+
+    - name: Install npm dependencies
+      shell: bash
+      run: npm install
+
+    - name: Build TailwindCSS
+      shell: bash
+      run: npx @tailwindcss/cli -i ./assets/main.css -o ./assets/tailwind.css
+
+    - name: Build GUI
+      shell: bash
+      run: dx bundle --release --target ${{ inputs.target }} --platform ${{ inputs.platform }} --package-types ${{ inputs.package_type }} --bin civ7-mod-manager-gui --no-default-features --features gui
+      env:
+        OPENSSL_USE_STATIC_LIBS: "1"
+
+    - shell: bash
+      run: ls dist

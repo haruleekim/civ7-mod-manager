@@ -1,0 +1,26 @@
+name: Setup MacOS
+description: Install build dependencies for MacOS and setup temporary keychain
+
+runs:
+  using: "composite"
+  steps:
+    - shell: bash
+      run: |
+        brew install pkgconfig
+        brew install libarchive
+        brew install openssl@3
+        echo PKG_CONFIG_PATH=$(brew ls libarchive | grep .pc$ | sed 's|/*.pc||') >> $GITHUB_ENV
+
+    - name: Setup temporary keychain
+      shell: bash
+      run: |
+        KEYCHAIN=build.keychain
+        KEYCHAIN_PASSWORD=$(openssl rand -base64 32)
+        security create-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN"
+        security default-keychain -s "$KEYCHAIN"
+        security unlock-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN"
+        security set-keychain-settings -t 3600 -l "$KEYCHAIN"
+        echo "$APPLE_CERTIFICATE" | base64 --decode > /tmp/civ7-mod-manager-certificate.p12
+        security import /tmp/civ7-mod-manager-certificate.p12 -k $KEYCHAIN -P "$APPLE_CERTIFICATE_PASSWORD" -T /usr/bin/codesign
+        rm /tmp/civ7-mod-manager-certificate.p12
+        security set-key-partition-list -S apple:,apple-tool:,codesign: -k $KEYCHAIN_PASSWORD $KEYCHAIN
