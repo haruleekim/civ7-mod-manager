@@ -1,6 +1,6 @@
 [package]
 name = "civ7-mod-manager"
-version = "0.1.0-beta"
+version = "0.1.0-beta.1"
 authors = ["Haru Kim <haruleekim@icloud.com>"]
 edition = "2024"
 
@@ -24,7 +24,7 @@ anyhow = "1"
 async-trait = "0.1"
 chrono = "0.4"
 clap = { version = "4", features = ["derive"], optional = true }
-compress-tools = "0.15"
+compress-tools = { version = "0.15", features = ["static"] }
 dioxus = { version = "0.6", features = ["desktop"], optional = true }
 dir-size = "0.1"
 prettytable = { version = "0.10", optional = true }

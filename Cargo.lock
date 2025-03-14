@@ -478,7 +478,7 @@ dependencies = [
 
 [[package]]
 name = "civ7-mod-manager"
-version = "0.1.0-beta"
+version = "0.1.0-beta.1"
 dependencies = [
  "anyhow",
  "async-trait",
