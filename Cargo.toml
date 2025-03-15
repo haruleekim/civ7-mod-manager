@@ -1,6 +1,6 @@
 [package]
 name = "civ7-mod-manager"
-version = "0.1.0-beta.2"
+version = "0.1.0-beta.3"
 authors = ["Haru Kim <haruleekim@icloud.com>"]
 edition = "2024"
 
