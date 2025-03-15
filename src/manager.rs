@@ -23,14 +23,9 @@ pub enum ModDirEntry {
 
 impl ModManager {
     pub fn load_default() -> Result<Self> {
-        env::var("CIV7_MODS_ROOT")
-            .map(PathBuf::from)
-            .or_else(|_| {
-                let root_dir = default_root_dir();
-                fs::create_dir_all(&root_dir)?;
-                Ok(root_dir)
-            })
-            .and_then(Self::load)
+        let root_dir = default_root_dir();
+        fs::create_dir_all(&root_dir)?;
+        Self::load(root_dir)
     }
 
     pub fn load(root_dir: impl AsRef<Path>) -> Result<Self> {
@@ -175,33 +170,37 @@ pub fn mod_path(root_dir: impl AsRef<Path>, dirname: &str) -> PathBuf {
 }
 
 pub fn default_root_dir() -> PathBuf {
-    #[cfg(target_os = "windows")]
-    {
-        PathBuf::from(env::var_os("LOCALAPPDATA").unwrap())
-            .join("Firaxis Games")
-            .join("Sid Meier's Civilization VII")
-            .join("Mods")
-    }
+    env::var("CIV7_MODS_ROOT")
+        .map(PathBuf::from)
+        .unwrap_or_else(|_| {
+            #[cfg(target_os = "windows")]
+            {
+                PathBuf::from(env::var_os("LOCALAPPDATA").unwrap())
+                    .join("Firaxis Games")
+                    .join("Sid Meier's Civilization VII")
+                    .join("Mods")
+            }
 
-    #[cfg(target_os = "macos")]
-    {
-        PathBuf::from(env::var_os("HOME").unwrap())
-            .join("Library")
-            .join("Application Support")
-            .join("Civilization VII")
-            .join("Mods")
-    }
+            #[cfg(target_os = "macos")]
+            {
+                PathBuf::from(env::var_os("HOME").unwrap())
+                    .join("Library")
+                    .join("Application Support")
+                    .join("Civilization VII")
+                    .join("Mods")
+            }
 
-    #[cfg(target_os = "linux")]
-    {
-        PathBuf::from(env::var_os("HOME").unwrap())
-            .join("My Games")
-            .join("Sid Meier's Civilization VII")
-            .join("Mods")
-    }
+            #[cfg(target_os = "linux")]
+            {
+                PathBuf::from(env::var_os("HOME").unwrap())
+                    .join("My Games")
+                    .join("Sid Meier's Civilization VII")
+                    .join("Mods")
+            }
 
-    #[cfg(not(any(target_os = "windows", target_os = "macos", target_os = "linux")))]
-    {
-        unimplemented!("Unsupported platform")
-    }
+            #[cfg(not(any(target_os = "windows", target_os = "macos", target_os = "linux")))]
+            {
+                unimplemented!("Unsupported platform")
+            }
+        })
 }
