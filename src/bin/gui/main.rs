@@ -6,7 +6,7 @@ use dioxus::prelude::*;
 use std::{collections::HashSet, sync::Arc};
 
 use async_callback::*;
-use components::{AddModDialog, ModEntry, ModList};
+use components::{AddModDialog, ModDirInfo, ModList};
 use dialog::*;
 
 mod async_callback;
@@ -25,42 +25,54 @@ fn App() -> Element {
 
     let root_dir = manager.read().root_dir().display().to_string();
 
-    let entries = use_resource(move || async move {
+    let mut entries = use_resource(move || async move {
         let dirs = manager
             .read()
             .list_dirs()
             .await
             .map_err(dioxus::CapturedError::from_display)?
             .into_iter()
-            .filter_map(|dir| match dir {
-                ModDirEntry::Unmanaged(..) => None,
-                ModDirEntry::Managed(entry, dirname, spec) => {
-                    let content_size =
-                        dir_size::get_size_in_human_bytes(&entry.path()).unwrap_or_default();
+            .filter_map(|dir| {
+                let (entry, dirname, spec) = match dir {
+                    ModDirEntry::Managed(entry, dirname, spec) => (entry, dirname, Some(spec)),
+                    ModDirEntry::Unmanaged(entry, dirname) => (entry, dirname, None),
+                };
 
-                    let last_updated = entry
-                        .metadata()
-                        .and_then(|m| m.modified())
-                        .map(|system_time| {
-                            DateTime::<Local>::from(system_time)
-                                .format("%F %T %Z")
-                                .to_string()
-                        })
-                        .unwrap_or_default();
+                let content_size =
+                    dir_size::get_size_in_human_bytes(&entry.path()).unwrap_or_default();
 
-                    let entry = ModEntry {
-                        dirname: dirname.clone(),
-                        spec,
-                        loading: false,
+                let last_updated = entry
+                    .metadata()
+                    .and_then(|m| m.modified())
+                    .map(|system_time| {
+                        DateTime::<Local>::from(system_time)
+                            .format("%F %T %Z")
+                            .to_string()
+                    })
+                    .unwrap_or_default();
+
+                let entry = if let Some(spec) = spec {
+                    ModDirInfo::Managed {
+                        dirname,
                         content_size,
                         last_updated,
-                    };
+                        spec,
+                        loading: false,
+                    }
+                } else {
+                    ModDirInfo::Unmanaged {
+                        dirname,
+                        content_size,
+                        last_updated,
+                    }
+                };
 
-                    Some(entry)
-                }
+                Some(entry)
             });
         dioxus::Ok(dirs.collect::<Vec<_>>())
     });
+
+    let mut refresh = move || entries.restart();
 
     let mut loadings = use_signal_sync(HashSet::<String>::new);
 
@@ -68,7 +80,7 @@ fn App() -> Element {
     let entries = use_memo(use_reactive!(|entries| {
         let mut entries = entries;
         for entry in &mut entries {
-            entry.loading = loadings.read().contains(&entry.dirname);
+            entry.set_loading(loadings.read().contains(entry.dirname().as_str()));
         }
         entries
     }));
@@ -91,9 +103,16 @@ fn App() -> Element {
     };
 
     let update_all = move |_| {
-        for entry in entries() {
-            let _ = spawn(update(entry.dirname, entry.spec));
-        }
+        spawn(async move {
+            let tasks = tokio::task::LocalSet::new();
+            for entry in entries() {
+                if let ModDirInfo::Managed { dirname, spec, .. } = entry {
+                    tasks.spawn_local(update(dirname, spec));
+                }
+            }
+            tasks.await;
+            manager.write();
+        });
     };
 
     let onupdate = move |(dirname, spec): (String, ModSpec)| async move {
@@ -137,6 +156,9 @@ fn App() -> Element {
                 h1 { class: "text-2xl font-bold", "Civilization VII Mod Manager" }
                 div { class: "text-sm", {root_dir} }
             }
+
+
+            button { class: "btn btn-ghost", onclick: move |_| refresh(), "Refresh" }
 
             div { class: "join flex-auto",
                 button {

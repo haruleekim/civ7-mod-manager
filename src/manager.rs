@@ -2,6 +2,7 @@ use crate::{ModProvision, ModSpec};
 use anyhow::{Context, Result};
 use std::{
     collections::HashMap,
+    env,
     fs::{self, DirEntry, File},
     mem,
     ops::DerefMut,
@@ -22,9 +23,14 @@ pub enum ModDirEntry {
 
 impl ModManager {
     pub fn load_default() -> Result<Self> {
-        let root_dir = default_root_dir();
-        fs::create_dir_all(&root_dir)?;
-        Self::load(root_dir)
+        env::var("CIV7_MODS_ROOT")
+            .map(PathBuf::from)
+            .or_else(|_| {
+                let root_dir = default_root_dir();
+                fs::create_dir_all(&root_dir)?;
+                Ok(root_dir)
+            })
+            .and_then(Self::load)
     }
 
     pub fn load(root_dir: impl AsRef<Path>) -> Result<Self> {
@@ -171,7 +177,7 @@ pub fn mod_path(root_dir: impl AsRef<Path>, dirname: &str) -> PathBuf {
 pub fn default_root_dir() -> PathBuf {
     #[cfg(target_os = "windows")]
     {
-        PathBuf::from(std::env::var_os("LOCALAPPDATA").unwrap())
+        PathBuf::from(env::var_os("LOCALAPPDATA").unwrap())
             .join("Firaxis Games")
             .join("Sid Meier's Civilization VII")
             .join("Mods")
@@ -179,7 +185,7 @@ pub fn default_root_dir() -> PathBuf {
 
     #[cfg(target_os = "macos")]
     {
-        PathBuf::from(std::env::var_os("HOME").unwrap())
+        PathBuf::from(env::var_os("HOME").unwrap())
             .join("Library")
             .join("Application Support")
             .join("Civilization VII")
@@ -188,7 +194,7 @@ pub fn default_root_dir() -> PathBuf {
 
     #[cfg(target_os = "linux")]
     {
-        PathBuf::from(std::env::var_os("HOME").unwrap())
+        PathBuf::from(env::var_os("HOME").unwrap())
             .join("My Games")
             .join("Sid Meier's Civilization VII")
             .join("Mods")

@@ -4,30 +4,90 @@ use dioxus::prelude::*;
 use std::str::FromStr;
 
 #[derive(Clone, PartialEq)]
-pub struct ModEntry {
-    pub dirname: String,
-    pub spec: ModSpec,
-    pub loading: bool,
-    pub content_size: String,
-    pub last_updated: String,
+pub enum ModDirInfo {
+    Managed {
+        dirname: String,
+        content_size: String,
+        last_updated: String,
+        spec: ModSpec,
+        loading: bool,
+    },
+    Unmanaged {
+        dirname: String,
+        content_size: String,
+        last_updated: String,
+    },
+}
+
+impl ModDirInfo {
+    pub const fn dirname(&self) -> &String {
+        match self {
+            Self::Managed { dirname, .. } => dirname,
+            Self::Unmanaged { dirname, .. } => dirname,
+        }
+    }
+
+    pub const fn content_size(&self) -> &String {
+        match self {
+            Self::Managed { content_size, .. } => content_size,
+            Self::Unmanaged { content_size, .. } => content_size,
+        }
+    }
+
+    pub const fn last_updated(&self) -> &String {
+        match self {
+            Self::Managed { last_updated, .. } => last_updated,
+            Self::Unmanaged { last_updated, .. } => last_updated,
+        }
+    }
+
+    pub const fn loading(&self) -> bool {
+        match self {
+            Self::Managed { loading, .. } => *loading,
+            _ => false,
+        }
+    }
+
+    pub const fn set_loading(&mut self, loading: bool) {
+        match self {
+            Self::Managed {
+                loading: loading_, ..
+            } => {
+                *loading_ = loading;
+            }
+            _ => {}
+        }
+    }
+
+    pub const fn spec(&self) -> Option<&ModSpec> {
+        match self {
+            Self::Managed { spec, .. } => Some(spec),
+            _ => None,
+        }
+    }
 }
 
 #[component]
 pub fn ModList(
-    entries: ReadOnlySignal<Vec<ModEntry>>,
+    entries: ReadOnlySignal<Vec<ModDirInfo>>,
     #[props(into)] onremove: ReadOnlySignal<AsyncCallback<String, anyhow::Result<()>>>,
     #[props(into)] onupdate: ReadOnlySignal<AsyncCallback<(String, ModSpec), anyhow::Result<()>>>,
 ) -> Element {
     let items = entries().into_iter().map(|entry| {
-        let dirname_ = entry.dirname.clone();
+        let dirname_ = entry.dirname().clone();
         let onremove = move |_| onremove.read().call(dirname_.clone());
 
-        let dirname_ = entry.dirname.clone();
-        let spec_ = entry.spec.clone();
-        let onupdate = move |_| onupdate.read().call((dirname_.clone(), spec_.clone()));
+        let onupdate = if let Some(spec) = entry.spec().cloned() {
+            let dirname = entry.dirname().clone();
+            Some(AsyncCallback::new(move |_| {
+                onupdate.read().call((dirname.clone(), spec.clone()))
+            }))
+        } else {
+            None
+        };
 
         #[allow(unused_variables)]
-        let key = entry.dirname.clone();
+        let key = entry.dirname().clone();
 
         rsx! {
             ModListItem {
@@ -46,9 +106,9 @@ pub fn ModList(
 
 #[component]
 pub fn ModListItem(
-    entry: ReadOnlySignal<ModEntry>,
+    entry: ReadOnlySignal<ModDirInfo>,
     #[props(into)] onremove: ReadOnlySignal<AsyncCallback<(), anyhow::Result<()>>>,
-    #[props(into)] onupdate: ReadOnlySignal<AsyncCallback<(), anyhow::Result<()>>>,
+    #[props(into)] onupdate: ReadOnlySignal<Option<AsyncCallback<(), anyhow::Result<()>>>>,
 ) -> Element {
     let mut dialog_for_remove = use_dialog(move |mut state| {
         let onsubmit = move |_| async move {
@@ -66,7 +126,7 @@ pub fn ModListItem(
         };
 
         rsx! {
-            RemoveModDialog { state, dirname: entry().dirname, onsubmit }
+            RemoveModDialog { state, dirname: entry().dirname(), onsubmit }
         }
     });
 
@@ -74,24 +134,31 @@ pub fn ModListItem(
         li { class: "list-row",
             div { class: "list-col-grow",
                 div { class: "text-lg",
-                    span { class: "mr-3", {entry().dirname} }
-                    if entry().loading {
+                    span { class: "mr-3", {entry().dirname().clone()} }
+                    if entry().loading() {
                         span { class: "loading loading-sm loading-spinner" }
                     }
                 }
                 div { class: "text-xs",
-                    {entry().content_size}
+                    {entry().content_size().clone()}
                     " · "
-                    {entry().last_updated}
+                    {entry().last_updated().clone()}
                 }
-                if entry().spec.source == "civfanatics" {
-                    div { class: "text-xs",
-                        a {
-                            class: "link link-info",
-                            href: Civfanatics::default().page_url(&entry().spec.identifier),
-                            target: "_blank",
-                            {entry().spec.to_string()}
-                        }
+                div { class: "text-xs",
+                    match entry().spec() {
+                        Some(spec) if spec.source == "civfanatics" => rsx! {
+                            a {
+                                class: "link link-info",
+                                href: Civfanatics::default().page_url(&spec.identifier),
+                                target: "_blank",
+                                {spec.to_string()}
+                            }
+                        },
+                        _ => rsx! {
+                            span { class: "text-zinc-500",
+                                "This directory is not tracked by this tool. If you want to manage it, please add it via the Mod Manager."
+                            }
+                        },
                     }
                 }
             }
@@ -102,15 +169,19 @@ pub fn ModListItem(
                     onclick: move |_| dialog_for_remove.state.open.set(true),
                     "Remove"
                 }
-                button {
-                    class: "join-item btn btn-sm btn-soft [--btn-color:var(--color-green-400)]",
-                    r#type: "button",
-                    onclick: move |_| {
-                        spawn(async move {
-                            onupdate.read().call(()).await.ok();
-                        });
-                    },
-                    "Update"
+                if entry().spec().is_some() {
+                    button {
+                        class: "join-item btn btn-sm btn-soft [--btn-color:var(--color-green-400)]",
+                        r#type: "button",
+                        onclick: move |_| {
+                            spawn(async move {
+                                if let Some(onupdate) = onupdate.read().as_ref() {
+                                    onupdate.call(()).await.ok();
+                                }
+                            });
+                        },
+                        "Update"
+                    }
                 }
             }
             {dialog_for_remove.element}
